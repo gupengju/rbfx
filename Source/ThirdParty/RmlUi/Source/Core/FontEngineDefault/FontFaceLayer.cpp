@@ -34,6 +34,9 @@
 
 namespace Rml {
 
+// Glyph atlas padding (pixels) around each glyph, prevents texture bleeding between adjacent glyphs.
+static constexpr int GLYPH_ATLAS_PADDING = 1;
+
 FontFaceLayer::FontFaceLayer(const SharedPtr<const FontEffect>& _effect) : colour(255, 255, 255)
 {
 	effect = _effect;
@@ -122,7 +125,7 @@ bool FontFaceLayer::Generate(const FontFaceHandleDefault* handle, const FontFace
 			character_boxes[character] = box;
 
 			// Add the character's dimensions into the texture layout engine.
-			texture_layout.AddRectangle((int)character, glyph_dimensions);
+			texture_layout.AddRectangle((int)character, glyph_dimensions + Vector2i(GLYPH_ATLAS_PADDING * 2, GLYPH_ATLAS_PADDING * 2));
 		}
 
 		constexpr int max_texture_dimensions = 1024;
@@ -146,10 +149,10 @@ bool FontFaceLayer::Generate(const FontFaceHandleDefault* handle, const FontFace
 			box.texture_index = rectangle.GetTextureIndex();
 
 			// Generate the character's texture coordinates.
-			box.texcoords[0].x = float(rectangle.GetPosition().x) / float(texture.GetDimensions().x);
-			box.texcoords[0].y = float(rectangle.GetPosition().y) / float(texture.GetDimensions().y);
-			box.texcoords[1].x = float(rectangle.GetPosition().x + rectangle.GetDimensions().x) / float(texture.GetDimensions().x);
-			box.texcoords[1].y = float(rectangle.GetPosition().y + rectangle.GetDimensions().y) / float(texture.GetDimensions().y);
+			box.texcoords[0].x = float(rectangle.GetPosition().x + GLYPH_ATLAS_PADDING) / float(texture.GetDimensions().x);
+			box.texcoords[0].y = float(rectangle.GetPosition().y + GLYPH_ATLAS_PADDING) / float(texture.GetDimensions().y);
+			box.texcoords[1].x = float(rectangle.GetPosition().x + rectangle.GetDimensions().x - GLYPH_ATLAS_PADDING) / float(texture.GetDimensions().x);
+			box.texcoords[1].y = float(rectangle.GetPosition().y + rectangle.GetDimensions().y - GLYPH_ATLAS_PADDING) / float(texture.GetDimensions().y);
 		}
 
 		const FontEffect* effect_ptr = effect.get();
@@ -210,7 +213,7 @@ bool FontFaceLayer::GenerateTexture(UniquePtr<const byte[]>& texture_data, Vecto
 			// Copy the glyph's bitmap data into its allocated texture.
 			if (glyph.bitmap_data)
 			{
-				byte* destination = rectangle.GetTextureData();
+				byte* destination = rectangle.GetTextureData() + rectangle.GetTextureStride() * GLYPH_ATLAS_PADDING + GLYPH_ATLAS_PADDING * 4;
 				const byte* source = glyph.bitmap_data;
 				const int num_bytes_per_line = glyph.bitmap_dimensions.x * (glyph.color_format == ColorFormat::RGBA8 ? 4 : 1);
 
@@ -238,7 +241,7 @@ bool FontFaceLayer::GenerateTexture(UniquePtr<const byte[]>& texture_data, Vecto
 		}
 		else
 		{
-			effect->GenerateGlyphTexture(rectangle.GetTextureData(), Vector2i(box.dimensions), rectangle.GetTextureStride(), glyph);
+			effect->GenerateGlyphTexture(rectangle.GetTextureData() + rectangle.GetTextureStride() * GLYPH_ATLAS_PADDING + GLYPH_ATLAS_PADDING * 4, Vector2i(box.dimensions), rectangle.GetTextureStride(), glyph);
 		}
 	}
 
